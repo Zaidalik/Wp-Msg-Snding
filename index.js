@@ -15,6 +15,7 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const app = express();
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(cookieParser()); // ✅ Parse cookies
 app.use(express.json()); // ✅ Parse JSON body
 app.use(express.urlencoded({ extended: true }));
@@ -68,7 +69,7 @@ function cleanPhone(rawPhone) {
 
 
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname, 'login.html'));
+    res.sendFile(path.join(__dirname,'public', 'login.html'));
 });
 
 
@@ -273,7 +274,7 @@ app.post('/save-message', requireLogin, async (req, res) => {
 });
 
 app.get('/customMessage.html', requireLogin, (req, res) => {
-    res.sendFile(path.join(__dirname, 'customMessage.html'));
+    res.sendFile(path.join(__dirname,'public', 'customMessage.html'));
 });
 
 
@@ -293,7 +294,7 @@ app.get('/app-logout', (req, res) => {
 });
 
 app.get('/qr.html', requireLogin, (req, res) => {
-    res.sendFile(path.join(__dirname, 'qr.html'));
+    res.sendFile(path.join(__dirname,'public', 'qr.html'));
 });
 
 app.get('/api/qr', (req, res) => {
