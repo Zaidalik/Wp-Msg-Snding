@@ -13,8 +13,6 @@ const {
     useMultiFileAuthState,
     DisconnectReason
 } = require('@whiskeysockets/baileys');
-const { powerSaveBlocker } = require('electron');
-powerSaveBlocker.start('prevent-app-suspension');
 
 const app = express();
 app.use(cookieParser()); // ✅ Parse cookies
