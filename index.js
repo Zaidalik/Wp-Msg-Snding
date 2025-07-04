@@ -69,8 +69,9 @@ function cleanPhone(rawPhone) {
 
 
 app.get('/login', (req, res) => {
-    res.sendFile(path.join(__dirname,'public', 'login.html'));
+    res.redirect('/login.html');
 });
+
 
 
 app.post('/login', async (req, res) => {
