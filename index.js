@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
@@ -103,6 +103,21 @@ req.session.user = {
     name: user.FirstName,
     credits: user.Credits
 };
+app.get('/api/custom-message', requireLogin, async (req, res) => {
+    try {
+        const userId = req.session.user.id;
+        const [rows] = await db.query('SELECT CustomMessage FROM Auth.Users WHERE id = ?', [userId]);
+
+        if (!rows.length) {
+            return res.status(404).send('Message not found');
+        }
+
+        res.json({ message: rows[0].CustomMessage || '' });
+    } catch (err) {
+        console.error('❌ Error fetching custom message:', err);
+        res.status(500).send('Server error');
+    }
+});
 
 res.redirect('/qr.html');
 
@@ -111,101 +126,6 @@ res.redirect('/qr.html');
         res.status(500).send('🔥 Server error');
     }
 });
-
-
-//app.post('/login', async (req, res) => {
-//    try {
-//        const { FirstName, password } = req.body;
-       
-//        // Find user by FirstName
-//        const [users] = await db.query('SELECT * FROM auth.users WHERE FirstName = ?', [FirstName]);
-
-//        if (users.length === 0) {
-//            return res.status(401).send('Invalid username or password');
-//        }
-
-//        const user = users[0];
-
-//        // Compare password hash
-//        const match = await bcrypt.compare(password, user.Password);
-//        if (!match) {
-//            return res.status(401).send('Invalid username or password');
-//        }
-
-//        req.session.loggedIn = true;
-//        req.session.user = {
-//            id: user.id,
-//            username: user.FirstName, 
-//            credits: user.credits
-//        };
-
-
-
-//        // Save session and then send response
-//        req.session.save(err => {
-//            if (err) {
-//                return res.status(500).send('Session save failed');
-//            }
-//            res.sendFile(path.join(__dirname, 'qr.html'));
-//        });
-
-//        // Do NOT call res.sendFile() here again
-//        // res.sendFile(path.join(__dirname,'qr.html')); <--- remove this line
-//    } catch (error) {
-//        console.error(error);
-//        res.status(500).send('Internal server error');
-//    }
-//});
-
-//////app.post('/login', (req, res) => {
-//////    const { FirstName, password } = req.body;
-
-//////    if (!FirstName || !password) {
-//////        return res.status(400).send('❌ Username and password required.');
-//////    }
-
-//////    const sql = 'SELECT * FROM Auth.Users WHERE FirstName = ?';
-
-//////    db.query(sql, [FirstName], async (err, results) => {
-//////        if (err) {
-//////            console.error('DB error:', err);
-//////            return res.status(500).send('Server error.');
-//////        }
-
-//////        if (results.length === 0) {
-//////            return res.status(401).send('❌ Invalid username or password. <a href="/login">Try again</a>');
-//////        }
-
-//////        const user = results[0];
-//////        try {
-//////            const match = await bcrypt.compare(password, user.Password);
-//////            if (!match) {
-//////                return res.status(401).send('❌ Invalid username or password. <a href="/login">Try again</a>');
-//////            }
-
-//////            req.session.loggedIn = true;
-//////            req.session.user = {
-//////                id: user.id,
-//////                FirstName: user.FirstName,
-//////                credits: user.Credits
-//////            };
-
-//////            // Start WhatsApp connection if needed
-//////            if ((!sock || !sock.user) && !connecting) {
-//////                console.log('🔄 Starting WhatsApp connection...');
-//////                startSock().catch(console.error);
-//////            }
-
-//////            // Redirect after successful login
-//////            res.sendFile(path.join(__dirname, 'public', 'qr.html'));
-
-
-//////        } catch (bcryptErr) {
-//////            console.error('Password compare error:', bcryptErr);
-//////            return res.status(500).send('Server error.');
-//////        }
-//////    });
-//////});
 
 
 app.post('/Signup', async (req, res) => {
