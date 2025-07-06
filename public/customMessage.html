@@ -12,18 +12,161 @@
     <link href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
   <style>
    
+
+
+    
+     body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        background: linear-gradient(to bottom right, #33ccff, #ff99ff);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+        /* Add a pseudo-element for animated gradient overlay */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom right, #ff99ff, #33ccff);
+            animation: fadeGradient 4s infinite alternate;
+            opacity: 0;
+            z-index: -1;
+        }
+
+    @keyframes fadeGradient {
+        0% {
+            opacity: 0;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .data {
+        position: relative;
+        z-index: 1;
+        padding: 2rem;
+        border-radius: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        transition: 0.5s;
+        backdrop-filter: blur(10px); /* Optional: gives frosted glass effect */
+    }
+        .data:hover {
+            box-shadow: 0px 0px 40px 0px grey;
+        }
+    #qrcode {
+        border-radius: 1rem; /* or try 10px */
+        overflow: hidden; /* ensures QR image doesn't overflow the rounded corners */
+    }
+    .circle {
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        background: #e0e0e0; /* Light gray or your preferred color */
+        border-radius: 50%;
+        margin: 0px 450px 200px 20px;
+        animation: floatUpDown 4s ease-in-out infinite;
+        z-index: 0; /* behind the content */
+    }
+    .circle2 {
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        background: #e0e0e0; /* Light gray or your preferred color */
+        border-radius: 50%;
+        margin: 300px 20px 20px 450px;
+        animation: floatDownUp 4s ease-in-out infinite;
+        z-index: 0; /* behind the content */
+    }
+    @keyframes floatUpDown {
+        0% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-20px);
+        }
+
+        100% {
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes floatDownUp {
+        0% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(20px);
+        }
+
+        100% {
+            transform: translateY(0);
+        }
+    }
+
+    .container {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
+    .logout {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 10px 20px;
+        border-radius: 20px;
+        color: BLACK;
+        transition:0.5S;
+        border: 1px solid BLACK;
+    }
+        .logout:HOVER {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 0 20px white;
+            color: white;
+            border: 1px solid white;
+        }
+    .navbar {
+        position: absolute;
+        top: 0;
+        width: 100%;
+        padding: 15px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        color: white;
+        z-index: 10;
+    }
     .sniglet-regular {
         font-family: "Sniglet", system-ui;
         font-weight: 400;
         font-style: normal;
     }
-
-    .sniglet-extrabold {
-        font-family: "Sniglet", system-ui;
-        font-weight: 800;
-        font-size:100px;
-        font-style: normal;
-    }
+.sniglet-extrabold {
+    font-family: "Sniglet", system-ui;
+    font-weight: 800;
+    font-size: 36px; /* or try 48px if you want it slightly bigger */
+    font-style: normal;
+    text-align: center;
+    margin-bottom: 20px;
+}
 
 
     .navbar-logo {
@@ -61,63 +204,79 @@
         font-weight: 400;
         font-style: normal;
     }
-    body {
-      font-family: sans-serif;
-      margin: 40px;
-      background: #f7f7f7;
-    }
+textarea {
+  min-height: 200px;
+}
 
-    select, textarea, button {
-      margin-top: 10px;
-      padding: 10px;
-      font-size: 16px;
-    }
 
-    textarea {
-      width: 100%;
-      height: 200px;
-    }
-
-    pre {
-      background: #eaeaea;
-      padding: 15px;
-      white-space: pre-wrap;
-    }
   </style>
 </head>
 <body>
 
     
-        
+        <nav class="navbar">
+        <p class="head">
+            Welcome,  &nbsp <span id="username">...  </span>  &nbsp  | 💰 Credits: <span id="credits">...</span>
+        </p>
+            <div class="spacer "></div> <!-- Empty spacer to balance the layout -->
+            <div class="navbar-logo sniglet-extrabold ">WhatsApp Sender</div>
+            <ul class="navbar-links  ">
+                <li><a href="/qr.html">QR Code</a></li>
+                 <li><a href="/customMessage.html">customMessage</a></li>
+                <li><a href="/send">Send Message</a></li>
+                <li><a href="/app-logout">Logout</a></li>
+            </ul>
+
     </nav>
-        <div class="container">
-  <h2>🛠️ Customize WhatsApp Message</h2>
 
-  <form id="custom-message-form">
-    <label for="insert-field">Insert Field:</label>
-    <select id="insert-field">
-      <option value="">-- Select --</option>
-      <option value="{firstName}">First Name</option>
-      <option value="{lastName}">Last Name</option>
-      <option value="{fullName}">Full Name</option>
-      <option value="{orderNumber}">Order Number</option>
-      <option value="{totalPrice}">Total Price</option>
-      <option value="{currency}">Currency</option>
-      <option value="{rawPhone}">Phone</option>
-      <option value="{fullAddress}">Full Address</option>
-      <option value="{supportNumber}">Support Number</option>
-    </select>
+    
+  <div class="container mt-5 d-flex flex-column align-items-center">
+    <!-- Title -->
+    <h2 class="text-center mb-4 sniglet-extrabold">🛠️ Customize WhatsApp Message</h2>
 
-    <br />
-    <textarea id="message-input" placeholder="Type your message here..."></textarea>
+    <!-- Form Card -->
+    <div class="card shadow p-4 w-100" style="max-width: 700px;">
+      <form id="custom-message-form" class="d-flex flex-column">
+        <!-- Dropdown -->
+        <div class="mb-3">
+          <label for="insert-field" class="form-label">Insert Field:</label>
+          <select id="insert-field" class="form-select">
+            <option value="">-- Select --</option>
+            <option value="{firstName}">First Name</option>
+            <option value="{lastName}">Last Name</option>
+            <option value="{fullName}">Full Name</option>
+            <option value="{orderNumber}">Order Number</option>
+            <option value="{totalPrice}">Total Price</option>
+            <option value="{currency}">Currency</option>
+            <option value="{rawPhone}">Phone</option>
+            <option value="{fullAddress}">Full Address</option>
+            <option value="{supportNumber}">Support Number</option>
+          </select>
+        </div>
 
-    <br />
-    <button type="submit">💾 Save Message</button>
-  </form>
+        <!-- Textarea -->
+        <div class="mb-3">
+          <label for="message-input" class="form-label">Message Template:</label>
+          <textarea id="message-input" class="form-control" rows="6" placeholder="Type your message here..."></textarea>
+        </div>
 
-  <h3>📄 Live Preview:</h3>
-  <pre id="message-preview"></pre>
+        <!-- Save Button -->
+        <div class="mb-3 text-end">
+          <button type="submit" class="btn btn-success">💾 Save Message</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Preview Card -->
+    <div class="mt-4 w-100" style="max-width: 700px;">
+      <h3 class="text-center mb-2">📄 Live Preview</h3>
+      <pre id="message-preview" class="bg-light p-3 rounded border"></pre>
+    </div>
+  </div>
 </div>
+
+
+
   <script>
     const fieldSelect = document.getElementById('insert-field');
     const messageInput = document.getElementById('message-input');
@@ -134,7 +293,29 @@
       fullAddress: "123 Street Name\nCity, Country",
       supportNumber: "03273627796"
     };
-
+// Load saved message on page load
+window.addEventListener('DOMContentLoaded', () => {
+  fetch('/api/custom-message')
+    .then(res => res.json())
+    .then(data => {
+      if (data.message) {
+        messageInput.value = data.message;
+        updatePreview(); // 👈 Update the live preview as well
+      }
+    })
+    .catch(err => {
+      console.error('❌ Error loading saved message:', err);
+    });
+});
+            fetch('/api/user-info')
+      .then(res => res.json())
+      .then(data => {
+                document.getElementById('username').textContent = data.username;
+            document.getElementById('credits').textContent = data.credits;
+      })
+      .catch(err => {
+                console.error('❌ Failed to load user info', err);
+      });
     // Insert placeholder when selected
     fieldSelect.addEventListener('change', () => {
       const value = fieldSelect.value;
