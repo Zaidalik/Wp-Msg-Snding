@@ -72,8 +72,21 @@ app.get('/login', (req, res) => {
     res.redirect('/login.html');
 });
 
+app.get('/api/custom-message', requireLogin, async (req, res) => {
+    try {
+        const userId = req.session.user.id;
+        const [rows] = await db.query('SELECT CustomMessage FROM Auth.Users WHERE id = ?', [userId]);
 
+        if (!rows.length) {
+            return res.status(404).send('Message not found');
+        }
 
+        res.json({ message: rows[0].CustomMessage || '' });
+    } catch (err) {
+        console.error('❌ Error fetching custom message:', err);
+        res.status(500).send('Server error');
+    }
+});
 app.post('/login', async (req, res) => {
     const { FirstName, password } = req.body;
     console.log("Login request received with FirstName:", FirstName, "and password:", password);
@@ -103,21 +116,7 @@ req.session.user = {
     name: user.FirstName,
     credits: user.Credits
 };
-app.get('/api/custom-message', requireLogin, async (req, res) => {
-    try {
-        const userId = req.session.user.id;
-        const [rows] = await db.query('SELECT CustomMessage FROM Auth.Users WHERE id = ?', [userId]);
 
-        if (!rows.length) {
-            return res.status(404).send('Message not found');
-        }
-
-        res.json({ message: rows[0].CustomMessage || '' });
-    } catch (err) {
-        console.error('❌ Error fetching custom message:', err);
-        res.status(500).send('Server error');
-    }
-});
 
 res.redirect('/qr.html');
 
