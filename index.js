@@ -7,6 +7,7 @@ const rimraf = require('rimraf');
 const path = require('path');
 const cors = require('cors');
 const db = require('./db'); // Your DB module, must export a query method or similar
+require('./keep_alive');
 
 const {
     default: makeWASocket,
