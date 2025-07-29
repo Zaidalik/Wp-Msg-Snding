@@ -1,13 +1,14 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const path = require('path');
 const cookieParser = require('cookie-parser');
 const bcrypt = require('bcrypt');
-const rimraf = require('rimraf');
-const path = require('path');
+const fs = require('fs');
+const rimraf = require('rimraf'); 
 const cors = require('cors');
-const db = require('./db'); // Your DB module, must export a query method or similar
-require('./keep_alive');
+const db = require('./db');
+// Your DB module, must export a query method or similar
 
 const {
     default: makeWASocket,
@@ -16,7 +17,6 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
 app.use(cookieParser()); // ✅ Parse cookies
 app.use(express.json()); // ✅ Parse JSON body
 app.use(express.urlencoded({ extended: true }));
@@ -27,7 +27,7 @@ app.use(session({
     saveUninitialized: false,
     cookie: {
         httpOnly: true,
-        maxAge: 30 * 60 * 1000, // 30 minutes
+         maxAge: 2 * 60 * 60 * 1000, // 2 hours
         sameSite: 'lax',        // adjust to 'none' if using HTTPS with different domain
         secure: false           // set to true if using HTTPS
     }
@@ -37,17 +37,31 @@ app.use(cors({
     origin: 'http://localhost:3000', // your frontend URL
     credentials: true               // allow cookies across origins
 }));
-
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use((req, res, next) => {
     console.log('Session on', req.path, ':', req.session);
     next();
 });
 
-// Global vars
-let sock = null;       // WhatsApp socket instance
-let latestQR = null;
-const authFolder = path.resolve(__dirname, 'auth_data');
+// Global vars 
+const connectingFlags = {};
+const latestQRs = {}; // Keyed by userId
+const sendMessageSock = {};
+
+//function getAuthFolder(userId) {
+//    return path.join(__dirname, 'auth', `user_${userId}`);
+//}
+function getAuthFolder(userId) {
+    const folderPath = path.join(__dirname, 'auth', `user_${userId}`);
+    if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath, { recursive: true });  // ✅ create if it doesn't exist
+        console.log(`📁 Created auth folder for user ${userId}`);
+    }
+    return folderPath;
+}
+const userSockets = {}; // 🧠 Track each user's WhatsApp connection
+
 let connecting = false; // Prevent multiple simultaneous connections
 
 // Middleware to protect routes
@@ -70,27 +84,13 @@ function cleanPhone(rawPhone) {
 
 
 app.get('/login', (req, res) => {
-    res.redirect('/login.html');
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-app.get('/api/custom-message', requireLogin, async (req, res) => {
-    try {
-        const userId = req.session.user.id;
-        const [rows] = await db.query('SELECT CustomMessage FROM Auth.Users WHERE id = ?', [userId]);
 
-        if (!rows.length) {
-            return res.status(404).send('Message not found');
-        }
-
-        res.json({ message: rows[0].CustomMessage || '' });
-    } catch (err) {
-        console.error('❌ Error fetching custom message:', err);
-        res.status(500).send('Server error');
-    }
-});
 app.post('/login', async (req, res) => {
     const { FirstName, password } = req.body;
-    console.log("Login request received with FirstName:", FirstName, "and password:", password);
+    //console.log("Login request received with FirstName:", FirstName, "and password:", password);
 
     try {
         const [rows] = await db.query('SELECT * FROM Auth.users WHERE firstname = ?', [FirstName]);
@@ -111,15 +111,24 @@ if (!match) {
     return res.status(401).send('Invalid username or password');
 }
 
-req.session.loggedIn = true;
-req.session.user = {
-    id: user.id,
-    name: user.FirstName,
-    credits: user.Credits
-};
+        req.session.loggedIn = true;
+        req.session.user = {
+            id: user.id,
+            name: user.FirstName,
+            credits: user.Credits,
+            TotalMesseges: user.TotalMesseges
+        };
 
+        req.session.save(async (err) => {
+            if (err) {
+                console.error('❌ Session save error:', err);
+                return res.status(500).send('Session error');
+            }
 
-res.redirect('/qr.html');
+            userSockets[user.id] = await startSock(user.id);
+            res.redirect('/dashboard');
+        });
+
 
     } catch (err) {
         console.error("Login error:", err);
@@ -145,8 +154,8 @@ app.post('/Signup', async (req, res) => {
 
         // Insert new user, id is auto-increment assumed, Credits default to 0
         const result = await db.query(
-            `INSERT INTO auth.users (FirstName, LastName, Email, Password, PhoneNumber, Credits) VALUES (?, ?, ?, ?, ?, ?)`,
-            [FirstName, LastName, Email, hashedPassword, PhoneNumber, 20]
+            `INSERT INTO auth.users (FirstName, LastName, Email, Password, PhoneNumber, Credits,TotalMesseges) VALUES (?, ?, ?, ?, ?, ?,?)`,
+            [FirstName, LastName, Email, hashedPassword, PhoneNumber, 20,0]
         );
 
         res.status(201).send('User registered successfully');
@@ -156,30 +165,20 @@ app.post('/Signup', async (req, res) => {
     }
 });
 
-app.get('/logout', (req, res) => {
-    if (!req.session) return res.redirect('/login');
+app.get('/api/custom-message', requireLogin, async (req, res) => {
+    try {
+        const userId = req.session.user.id;
+        const [rows] = await db.query('SELECT CustomMessage FROM Auth.Users WHERE id = ?', [userId]);
 
-    req.session.destroy(err => {
-        if (err) return res.send('❌ Error logging out');
+        if (!rows.length) {
+            return res.status(404).send('Message not found');
+        }
 
-        (async () => {
-            if (sock) {
-                try {
-                    await sock.logout();
-                } catch (e) {
-                    console.error('WhatsApp logout error:', e.message);
-                }
-            }
-
-            rimraf.sync(authFolder);
-
-            console.log('🔁 Restarting WhatsApp socket...');
-            startSock().catch(console.error);
-
-            res.redirect('/login');
-        })();
-    });
-
+        res.json({ message: rows[0].CustomMessage || '' });
+    } catch (err) {
+        console.error('❌ Error fetching custom message:', err);
+        res.status(500).send('Server error');
+    }
 });
 app.post('/save-message', requireLogin, async (req, res) => {
     const userId = req.session.user.id;
@@ -195,9 +194,42 @@ app.post('/save-message', requireLogin, async (req, res) => {
 });
 
 app.get('/customMessage.html', requireLogin, (req, res) => {
-    res.sendFile(path.join(__dirname,'public', 'customMessage.html'));
+    res.sendFile(path.join(__dirname, 'public', 'customMessage.html'));
 });
 
+
+app.get('/logout/:userId', async (req, res) => {
+    const userId = req.params.userId;
+    const sessionPath = `./auth/user_${userId}`;
+    const sock = userSockets[userId];
+
+    if (!sock) {
+        return res.status(400).send('❌ WhatsApp not connected for this user.');
+    }
+
+    try {
+        // ✅ Logout via Baileys
+        await sock.logout();
+
+        // ✅ Delete folder after logout
+        const fs = require('fs/promises');
+        const exists = await fs.access(sessionPath).then(() => true).catch(() => false);
+        if (exists) {
+            await fs.rm(sessionPath, { recursive: true, force: true });
+        }
+
+        // ✅ Clean up sockets
+        delete userSockets[userId];
+        delete sendMessageSock[userId];
+        delete latestQRs[userId];
+        delete activeSockets[userId];
+
+        res.send('✅ WhatsApp session logged out and session files deleted');
+    } catch (err) {
+        console.error('❌ Error during logout:', err);
+        res.status(500).send('❌ Failed to logout WhatsApp session');
+    }
+});
 
 
 // App-only logout (does not logout WhatsApp)
@@ -215,33 +247,58 @@ app.get('/app-logout', (req, res) => {
 });
 
 app.get('/qr.html', requireLogin, (req, res) => {
-    res.sendFile(path.join(__dirname,'public', 'qr.html'));
+    res.sendFile(path.join(__dirname, 'public', 'qr.html'));
+});
+app.get('/index', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/api/qr', (req, res) => {
-    if (sock && sock.user) {
-        // Connected, no QR needed
-        return res.json({ qr: null, connected: true });
-    }
-    return res.json({ qr: latestQR, connected: false });
+
+
+// Optional: Redirect "/" to "/index"
+app.get('/', (req, res) => {
+    res.redirect('/index');
 });
+
+
+app.get('/dashboard',requireLogin,  (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+
+
+app.get('/api/qr', (req, res) => {
+    const userId = req.session?.user?.id;
+
+    if (!userId) {
+        return res.status(401).send({ error: 'Not logged in' });
+    }
+
+    const connected = activeSockets[userId] === true;
+    const qr = latestQRs[userId];
+
+    return res.json({ qr, connected });
+});
+
+
 
 
 
 app.get('/api/user-info', (req, res) => {
+
+
     if (!req.session || !req.session.user) {
         return res.status(401).json({ error: 'Not logged in' });
     }
-
     res.json({
         userId: req.session.user.id,      // ✅ include userId
         username: req.session.user.name,
-        credits: req.session.user.credits
+        credits: req.session.user.credits,
+        TotalMesseges: req.session.user.TotalMesseges
     });
+
+
 });
-
-
-
 app.post('/send/:userId', async (req, res) => {
     try {
         const userId = req.params.userId;
@@ -250,7 +307,7 @@ app.post('/send/:userId', async (req, res) => {
 
         if (!userId) return res.status(401).send('❌ Unauthorized: user not logged in.');
 
-        // Extract and clean phone number
+        // ✅ Extract and clean phone number
         let rawPhone = order.shipping_address?.phone || order.customer?.phone;
         if (!rawPhone) return res.status(400).send('❌ Phone number missing');
 
@@ -260,29 +317,59 @@ app.post('/send/:userId', async (req, res) => {
         }
         const jid = `${cleanedPhone}@s.whatsapp.net`;
 
-        if (!sock || sock.user === undefined) {
-            return res.status(503).send('❌ WhatsApp not connected.');
-        }
+let userSock = userSockets[userId];
 
-        // ✅ Check credits
-        const [userData] = await db.query('SELECT Credits, CustomMessage,PhoneNumber FROM Auth.Users WHERE id = ?', [userId]);
-        const user = userData?.[0];
+if (!userSock || !activeSockets[userId]) {
+
+    console.log(`🔁 WhatsApp socket not connected. Attempting reconnect for user ${userId}...`);
+
+    await startSock(userId);
+
+    const maxWait = 15000;
+    const start = Date.now();
+    while (!activeSockets[userId] && Date.now() - start < maxWait) {
+        await new Promise(res => setTimeout(res, 500));
+    }
+
+    userSock = userSockets[userId];
+
+    if (!userSock || !activeSockets[userId]) {
+        // 🟡 Queue the message before responding
+        if (!pendingMessages[userId]) {
+            pendingMessages[userId] = [];
+        }
+        pendingMessages[userId].push({ jid, content: { text: message } });
+
+        console.log(`🕒 Message queued for user ${userId} due to socket being unavailable.`);
+        return res.status(202).send('🕒 WhatsApp not connected. Message has been queued for retry after login.');
+    }
+}
+
+
+
+        // ✅ Fetch Credits, CustomMessage, and PhoneNumber
+        const [userResults] = await db.query(
+            'SELECT Credits, CustomMessage, PhoneNumber FROM Auth.Users WHERE id = ?',
+            [userId]
+        );
+        const user = userResults?.[0];
 
         if (!user || user.Credits <= 0) {
             return res.status(403).send('❌ Not enough credits to send a message.');
         }
 
-        // ✅ Prepare values to replace
+        // ✅ Prepare values for replacement
         const firstName = order.shipping_address?.first_name || '';
         const lastName = order.shipping_address?.last_name || '';
         const fullName = `${firstName} ${lastName}`.trim();
+        const StoreName = order.line_items?.[0]?.vendor || '';
         const orderNumber = order.name?.replace('#', '') || '0000';
         const totalPrice = order.current_total_price || '0.00';
         const currency = order.currency || 'PKR';
         const addressLine1 = order.shipping_address?.address1 || '';
         const addressLine2 = order.shipping_address?.address2 || '';
         const fullAddress = `${addressLine1}\n${addressLine2}`;
-        const supportNumber = user.PhoneNumber;
+        const supportNumber = user.PhoneNumber || '03273627796';
 
         const replacements = {
             firstName,
@@ -295,113 +382,168 @@ app.post('/send/:userId', async (req, res) => {
             addressLine1,
             addressLine2,
             fullAddress,
-            supportNumber
+            supportNumber,
+            StoreName
         };
 
-        // ✅ Use custom message or default one
-        let template = user.CustomMessage || 
-            `Dear {fullName}, I am Syed from 📦. Please confirm your Order {orderNumber}, if yes then your parcel will be delivered to you in 5 to 6 Days.\n\n` +
+        // ✅ Use custom message if available
+        let template = user.CustomMessage ||
+            `Dear {fullName}, I am from Wazap. Please confirm your Order {orderNumber}, if yes then your parcel will be delivered to you in 5 to 6 Days.\n\n` +
             `📍 Please Confirm your Address:\n{fullAddress}\n` +
             `📞 {rawPhone}\n\n` +
             `💵 Please Keep {currency} {totalPrice} ready and pay at delivery.\n\n` +
             `❓ If any problem occurs or you need our help, you can contact us on our main Number: {supportNumber}\n\n` +
             `Thank you for Ordering 👍`;
 
-        // ✅ Replace placeholders
-        Object.entries(replacements).forEach(([key, val]) => {
-            const regex = new RegExp(`{${key}}`, 'g');
-            template = template.replace(regex, val);
+        // ✅ Replace placeholders in template
+        Object.entries(replacements).forEach(([key, value]) => {
+            template = template.replace(new RegExp(`{${key}}`, 'g'), value);
         });
 
         const message = template;
 
-        // ✅ Send message
-        await sock.sendMessage(jid, { text: message });
+        // ✅ Send message via socket
+        try {
+    if (!activeSockets[userId]) {
+        queueMessage(userId, { jid, content: { text: message } });
+        return res.status(202).send('🔁 Socket not ready, message queued.');
+    }
 
-        // ✅ Deduct credit
-        await db.query('UPDATE Auth.Users SET Credits = Credits - 1 WHERE id = ?', [userId]);
+    await userSock.sendMessage(jid, { text: message });
+    await db.query('UPDATE Auth.Users SET Credits = Credits - 1 , TotalMesseges = TotalMesseges + 1   WHERE id = ?', [userId]);
 
-        res.status(200).send('✅ Message sent and credit deducted!');
+    res.status(200).send('✅ Message sent and credit deducted!');
+} catch (err) {
+    console.error('❌ Failed to send message:', err);
+    queueMessage(userId, { jid, content: { text: message } });
+    res.status(500).send('❌ Failed to send, message queued for retry.');
+}
+
+
     } catch (err) {
         console.error('❌ Error in /send:', err);
         res.status(500).send('❌ Internal server error');
     }
 });
+ 
+const pendingMessages = {}; // userId: [messages]
+
+function queueMessage(userId, msg) {
+  if (!pendingMessages[userId]) pendingMessages[userId] = [];
+  pendingMessages[userId].push(msg);
+}
+async function flushPendingMessages(userId, sock) {
+  if (!pendingMessages[userId] || pendingMessages[userId].length === 0) return;
+
+  console.log(`📨 Flushing ${pendingMessages[userId].length} queued messages for user ${userId}`);
+
+  const messagesToSend = [...pendingMessages[userId]];
+  pendingMessages[userId] = []; // Clear queue first to avoid duplicates
+
+  for (const msg of messagesToSend) {
+    try {
+      await sock.sendMessage(msg.jid, msg.content);
+      console.log(`✅ Retried message sent to ${msg.jid} for user ${userId}`);
+    } catch (err) {
+      console.error(`❌ Failed to resend message to ${msg.jid} for user ${userId}:`, err);
+      queueMessage(userId, msg); // Re-queue it if it fails
+    }
+  }
+}
 
 
-//app.post('/send', (req, res) => {
-//    // Prefer shipping address name
-//    const firstName = req.body.shipping_address?.first_name || '';
-//    const lastName = req.body.shipping_address?.last_name || '';
-//    const fullName = `${firstName} ${lastName}`.trim();
+// 🧠 Store active sockets and connection flags per user
+const activeSockets = {};
 
-//    console.log("👤 Customer Name:", fullName);
-
-//    res.sendStatus(200);
-//});
-
-
-// WhatsApp connection starter
-async function startSock() {
-    if (connecting) {
-        console.log('⚠️ Already connecting, skipping...');
+async function startSock(userId, customPath = null) {
+    // ⛔ Prevent double connection attempts per user
+    if (connectingFlags[userId]) {
+        console.log(`⚠️ Already connecting for user ${userId}, skipping...`);
         return;
     }
-    connecting = true;
+
+    connectingFlags[userId] = true;
+
     try {
-        console.log('🔁 Initializing WhatsApp socket...');
-        latestQR = null;
+        console.log(`🔁 Initializing WhatsApp socket for user ${userId}...`);
+        const authFolder = customPath || path.join(__dirname, 'auth', `user_${userId}`);
+        if (!fs.existsSync(authFolder)) {
+            fs.mkdirSync(authFolder, { recursive: true });
+            console.log(`📁 Created auth folder for user ${userId}`);
+        }
 
         const { state, saveCreds } = await useMultiFileAuthState(authFolder);
 
-        sock = makeWASocket({
+        const sock = makeWASocket({
             auth: state,
             browser: ['Chrome', 'Windows', '10']
         });
 
+        // Store the socket
+        userSockets[userId] = sock;
+
+        // Save credentials on update
         sock.ev.on('creds.update', saveCreds);
 
+        // Handle connection events
         sock.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                latestQR = qr;
-                console.log('📸 New QR code generated');
+                latestQRs[userId] = qr;
+                console.log(`📸 New QR code generated for user ${userId}`);
             }
 
             if (connection === 'open') {
-                console.log('✅ WhatsApp connected');
-                latestQR = null;
+                console.log(`✅ WhatsApp connected for user ${userId}`);
+
+                activeSockets[userId] = true;                // ✅ Mark socket active
+                userSockets[userId] = sock;                  // ✅ Store socket reference
+                sendMessageSock[userId] = sock;              // ✅ Store for messaging
+                delete latestQRs[userId];                    // ✅ Clear QR
+
+                flushPendingMessages(userId, sock);          // ✅ Resend suspended messages
             }
 
             if (connection === 'close') {
                 const statusCode = lastDisconnect?.error?.output?.statusCode;
                 const loggedOut = statusCode === DisconnectReason.loggedOut;
 
-                console.log('❌ WhatsApp connection closed. Status code:', statusCode);
+                console.log(`❌ WhatsApp connection closed for user ${userId}. Status code:`, statusCode);
+
+                // Cleanup on disconnect
+                delete activeSockets[userId];
+                delete userSockets[userId];
+                delete sendMessageSock[userId];
 
                 if (loggedOut) {
-                    console.log('🚨 Logged out from WhatsApp, deleting auth data...');
-                    rimraf.sync(authFolder);
-                    sock = null;
-                    startSock().catch(console.error);
+                    console.log(`🚨 Logged out for user ${userId}, deleting auth data...`);
+                    rimraf.sync(authFolder);                  // Delete session
+                    delete latestQRs[userId];
+                    startSock(userId).catch(console.error);   // Reinit session
                 } else {
-                    console.log('🔁 Reconnecting in 5 seconds...');
-                    setTimeout(() => startSock().catch(console.error), 5000);
+                    console.log(`🔁 Reconnecting user ${userId} in 5 seconds...`);
+                    setTimeout(() => startSock(userId).catch(console.error), 5000);
                 }
             }
         });
+
+        return sock;
+
     } catch (err) {
-        console.error('❌ Failed to start WhatsApp socket:', err);
+        console.error(`❌ Failed to start WhatsApp socket for user ${userId}:`, err);
     } finally {
-        connecting = false;
+        connectingFlags[userId] = false;
     }
 }
+
+
+
 
 // Start server and WhatsApp connection
 (async () => {
     try {
-        await startSock();
+        
     } catch (err) {
         console.error('❌ Initial WhatsApp connect failed:', err);
     }
