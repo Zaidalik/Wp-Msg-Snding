@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Index - Passion Bootstrap Template</title>
+  <title>WAZAP</title>
   <meta name="description" content="">
   <meta name="keywords" content="">
 
@@ -58,7 +58,7 @@
       </a>
 
       <!-- ✅ Navigation -->
-      <nav id="navmenu" class="navmenu">
+   <nav id="navmenu" class="navmenu">
         <ul>
           <li><a href="#hero" class="active">Home</a></li>
           <li><a href="#about">About</a></li>
@@ -1720,7 +1720,16 @@ With innovation, transparency, and user-first design at our core, we help creato
     </div>
 
   </footer>
-
+<script>
+    window.addEventListener("scroll", function () {
+    const header = document.querySelector("#header");
+    if (window.scrollY > 50) {
+      header.classList.add("scrolled");
+    } else {
+      header.classList.remove("scrolled");
+    }
+  });
+</script>
   <!-- Scroll Top -->
   <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
 
