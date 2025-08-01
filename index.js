@@ -114,7 +114,12 @@ if (!password || !user.Password) {
 
 const match = await bcrypt.compare(password, user.Password);
 if (!match) {
-    return res.status(401).send('Invalid username or password');
+     return res.send(`
+  <script>
+    alert("Invalid username or password. Please login again.");
+    window.location.href = "/login";
+  </script>
+`);
 }
 
         req.session.loggedIn = true;
@@ -504,7 +509,7 @@ async function startSock(userId, customPath = null) {
 
             if (qr) {
                 latestQRs[userId] = qr;
-                console.log(`📸 New QR code generated for user ${userId}`);
+              
             }
 
             if (connection === 'open') {
