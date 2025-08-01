@@ -96,7 +96,13 @@ app.post('/login', async (req, res) => {
         const [rows] = await db.query('SELECT * FROM Auth.users WHERE firstname = ?', [FirstName]);
 
         if (rows.length === 0) {
-            return res.status(401).send('Invalid username or password');
+            return res.send(`
+  <script>
+    alert("Invalid username or password. Please login again.");
+    window.location.href = "/login";
+  </script>
+`);
+
         }
 const user = rows[0];
 console.log("Fetched user from DB:", user);
@@ -131,9 +137,16 @@ if (!match) {
 
 
     } catch (err) {
-        console.error("Login error:", err);
-        res.status(500).send('🔥 Server error');
-    }
+  console.error("Login error:", err);
+ res.send(`
+  <script>
+    alert("Please login again.");
+    window.location.href = "/login?nocache=" + new Date().getTime();
+  </script>
+`);
+
+}
+
 });
 
 
