@@ -148,8 +148,6 @@ h6 {
   --background-color: rgba(0, 0, 0, 0);
   --heading-color: #ffffff;
   --surface-color: rgba(255, 255, 255, 0.085);
-    backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px); /* For Safari */
   color: var(--default-color);
   transition: all 0.5s;
   z-index: 997;
@@ -232,6 +230,7 @@ h6 {
 
 .scrolled .header .topbar {
   height: 0;
+  backdrop-filter: blur(10px); 
   visibility: hidden;
   overflow: hidden;
 }
@@ -239,8 +238,28 @@ h6 {
 /* Global Header on Scroll
 ------------------------------*/
 .scrolled .header {
+  background-color: rgba(255, 255, 255, 0.3); /* semi-transparent */
+
+}
+/* Apply blur only when scrolled */
+#header.scrolled {
+  position: fixed;
+  width: 100%;
+  z-index: 999;
+  background: transparent;
+  overflow: hidden;
+}
+
+/* Add blur using pseudo-element */
+#header.scrolled::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(255, 255, 255, 0.3); /* semi-transparent */
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px); /* For Safari */
+  -webkit-backdrop-filter: blur(10px); /* Safari support */
+  z-index: -1; /* stay behind actual header content */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 /*--------------------------------------------------------------
