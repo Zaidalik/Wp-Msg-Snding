@@ -64,6 +64,62 @@ const userSockets = {}; // 🧠 Track each user's WhatsApp connection
 
 let connecting = false; // Prevent multiple simultaneous connections
 
+
+
+// npm install axios
+const axios = require('axios');
+
+const OPENROUTER_API_KEY = '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';
+
+const systemPrompt = `
+You are WAZ.AI — the official AI support assistant for the WAZAP platform.
+
+WAZAP is a web-based WhatsApp messaging utility that allows users to:
+- Scan a QR code to connect their WhatsApp.
+- Send WhatsApp messages manually or via webhook.
+- Customize messages with dynamic fields like {FirstName}, {OrderID}, etc.
+- Manage message credits (each user has a limited number).
+- Use a webhook by sending parameters like number, message, and variables.
+
+Your job is to:
+- ONLY assist with WAZAP-related features.
+- Clearly explain how to use WAZAP tools like QR login, message sending, webhook, or dynamic variables.
+- Never claim to be a general chatbot or personal assistant.
+- Politely redirect any unrelated questions back to WAZAP topics.
+
+Do NOT respond to unrelated topics like school help, personal advice, or general web browsing.
+`;
+
+
+app.post('/api/chat', async (req, res) => {
+  const userMessage = req.body.message;
+
+  try {
+    const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
+      model: "moonshotai/kimi-k2:free",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage }
+      ],
+      max_tokens: 200
+    }, {
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    res.json({ reply: response.data.choices[0].message.content });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Error talking to Kimi K2." });
+  }
+});
+
+
+
+
 // Middleware to protect routes
 function requireLogin(req, res, next) {
     if (req.session && req.session.loggedIn) {
@@ -509,7 +565,7 @@ async function startSock(userId, customPath = null) {
 
             if (qr) {
                 latestQRs[userId] = qr;
-              
+                
             }
 
             if (connection === 'open') {
