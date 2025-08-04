@@ -69,7 +69,7 @@ let connecting = false; // Prevent multiple simultaneous connections
 // npm install axios
 const axios = require('axios');
 
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = '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';
 
 const systemPrompt = `
 You are WAZ.AI — the official AI support assistant for the WAZAP platform.
@@ -626,4 +626,5 @@ async function startSock(userId, customPath = null) {
 app.listen(process.env.PORT || 3000, () => {
     console.log(`🚀 Server running at http://localhost:${process.env.PORT || 3000}`);
 });
+
 
