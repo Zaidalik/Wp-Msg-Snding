@@ -15,7 +15,7 @@ const {
     useMultiFileAuthState,
     DisconnectReason
 } = require('@whiskeysockets/baileys');
-
+const apiKey = process.env.OPENROUTER_API_KEY;
 const app = express();
 app.use(cookieParser()); // ✅ Parse cookies
 app.use(express.json()); // ✅ Parse JSON body
@@ -104,7 +104,7 @@ app.post('/api/chat', async (req, res) => {
       max_tokens: 200
     }, {
       headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer  ${apiKey}`,
         'Content-Type': 'application/json'
       }
     });
@@ -626,6 +626,7 @@ async function startSock(userId, customPath = null) {
 app.listen(process.env.PORT || 3000, () => {
     console.log(`🚀 Server running at http://localhost:${process.env.PORT || 3000}`);
 });
+
 
 
 
