@@ -370,7 +370,7 @@ sendBtn.onclick = async () => {
   chatHistory.push({ role: "user", content: userMsg });
 
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch('https://wp-msg-snding.onrender.com/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: userMsg })
@@ -406,3 +406,4 @@ sendBtn.onclick = async () => {
   <script src="assets/js/main.js"></script>
 
 </html>
+
